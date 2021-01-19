@@ -1,4 +1,5 @@
-WTR_DEFAULT_PROJECT='/home/lis/src/cockpit'
+WTR_DEFAULT_SRCDIR=~/src
+WTR_DEFAULT_PROJECT='cockpit'
 WTR_DEFAULT_BRANCH='main'
 
 # find the common gitdir for a given working tree
@@ -18,7 +19,7 @@ wtr_absolute_git_common_dir() {
 wtr_find_gitdir() {
     wtr_absolute_git_common_dir . || \
         wtr_absolute_git_common_dir "${WTR_DEFAULT_BRANCH}" || \
-        wtr_absolute_git_common_dir "${WTR_DEFAULT_PROJECT}/${WTR_DEFAULT_BRANCH}"
+        wtr_absolute_git_common_dir "${WTR_DEFAULT_SRCDIR}/${WTR_DEFAULT_PROJECT}/${WTR_DEFAULT_BRANCH}"
 }
 
 wtr_cd() {
@@ -88,7 +89,12 @@ wtr_check() {
 wtr() {
     case "$1" in
         reload)
-            . ~/wtr.sh
+            if test -n "${BASH_VERSION}" -a -n "${BASH_SOURCE}"; then
+                echo "Sourcing ${BASH_SOURCE}"
+                . "${BASH_SOURCE}"
+            else
+                echo "Don't know how to find script source"
+            fi
             ;;
 
         ls)
