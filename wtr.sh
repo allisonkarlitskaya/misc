@@ -4,7 +4,7 @@ WTR_DEFAULT_BRANCH='main'
 
 # find the common gitdir for a given working tree
 # returns the empty string if it's not a working tree
-wtr_absolute_git_common_dir() {
+_wtr_absolute_git_common_dir() {
     # we have --git-dir, --absolute-git-dir, --git-common-dir,
     # but no --absolute-git-common-dir
     local relative="$(git -C "$1" rev-parse --git-common-dir 2>/dev/null)"
@@ -16,14 +16,14 @@ wtr_absolute_git_common_dir() {
     popd >/dev/null
 }
 
-wtr_find_gitdir() {
-    wtr_absolute_git_common_dir . || \
-        wtr_absolute_git_common_dir "${WTR_DEFAULT_BRANCH}" || \
-        wtr_absolute_git_common_dir "${WTR_DEFAULT_SRCDIR}/${WTR_DEFAULT_PROJECT}/${WTR_DEFAULT_BRANCH}"
+_wtr_find_gitdir() {
+    _wtr_absolute_git_common_dir . || \
+        _wtr_absolute_git_common_dir "${WTR_DEFAULT_BRANCH}" || \
+        _wtr_absolute_git_common_dir "${WTR_DEFAULT_SRCDIR}/${WTR_DEFAULT_PROJECT}/${WTR_DEFAULT_BRANCH}"
 }
 
-wtr_cd() {
-    local gitdir="$(wtr_find_gitdir)"
+_wtr_cd() {
+    local gitdir="$(_wtr_find_gitdir)"
     if test -z "${gitdir}"; then
         return 1
     fi
@@ -37,8 +37,8 @@ wtr_cd() {
     cd "${worktree}"
 }
 
-wtr_list() {
-    local gitdir="$(wtr_find_gitdir)"
+_wtr_list() {
+    local gitdir="$(_wtr_find_gitdir)"
     if test -z "${gitdir}"; then
         return 1
     fi
@@ -47,8 +47,8 @@ wtr_list() {
 
 }
 
-wtr_ls() {
-    local gitdir="$(wtr_find_gitdir)"
+_wtr_ls() {
+    local gitdir="$(_wtr_find_gitdir)"
     if test -z "${gitdir}"; then
         return 1
     fi
@@ -60,8 +60,8 @@ wtr_ls() {
     )
 }
 
-wtr_check() {
-    local gitdir="$(wtr_find_gitdir)"
+_wtr_check() {
+    local gitdir="$(_wtr_find_gitdir)"
     local topdir="$(realpath "${gitdir}/../..")"
 
     for file in "${topdir}"/*; do
@@ -69,7 +69,7 @@ wtr_check() {
             echo "${file} is not a directory"
             continue
         fi
-        local filegitdir="$(wtr_absolute_git_common_dir "${file}")"
+        local filegitdir="$(_wtr_absolute_git_common_dir "${file}")"
         if test -z "${filegitdir}"; then
             echo "${file} is not a git working tree"
             continue
@@ -99,23 +99,46 @@ wtr() {
 
         ls)
             shift
-            wtr_ls "$@"
+            _wtr_ls "$@"
             ;;
 
         list)
-            wtr_list
+            _wtr_list
             ;;
 
         check)
-            wtr_check
+            _wtr_check
             ;;
 
         cd)
             shift
-            wtr_cd "$@";
+            _wtr_cd "$@";
             ;;
         *)
             echo 'unknown command'
             ;;
     esac
 }
+
+_wtr_complete_cd() {
+    test "${COMP_CWORD}" = 2 || return 1
+    local gitdir="$(_wtr_find_gitdir)"
+    test -n "${gitdir}" || return 1
+    local branches="$(git --git-dir="${gitdir}" for-each-ref --format='%(refname:lstrip=-1)')"
+    compgen -W "${branches}" "$2"
+}
+
+_wtr_complete() {
+    #echo $1 $2 $3
+    #set | grep ^COMP
+    if test "${COMP_CWORD}" = "1"; then
+        COMPREPLY=($(compgen -W "reload ls list check cd" "$2"))
+    else
+        cmd="${COMP_WORDS[1]}"
+        if test "$(type -t "_wtr_complete_${cmd}")" = "function"; then
+            COMPREPLY=($("_wtr_complete_${cmd}" "wtr ${cmd}" "$2" "$3"))
+        fi
+    fi
+}
+
+complete -F _wtr_complete wtr
